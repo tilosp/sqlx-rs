@@ -1,0 +1,124 @@
+# https://circleci.com/docs/2.0/configuration-reference
+version: 2.1
+
+jobs:
+  format:
+    docker:
+      - image: rust:1.44
+    steps:
+      - checkout
+      - run: rustup component add rustfmt
+      - run: cargo fmt --all -- --check
+
+  sqlx-check:
+    docker:
+      - image: rust:1.44
+    parameters:
+      runtime:
+        type: string
+        default: "async-std"
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            - v1-sqlx-{{ arch }}-{{ checksum "Cargo.lock" }}-<<parameters.runtime>>
+            - v1-sqlx-{{ arch }}
+
+      - run: |
+          cargo check -p sqlx \
+            --no-default-features \
+            --features offline,all-databases,all-types,runtime-<<parameters.runtime>>,macros
+
+      - save_cache:
+          key: v1-sqlx-{{ arch }}-{{ checksum "Cargo.lock" }}-<<parameters.runtime>>
+          paths:
+            - ~/.cargo/registry
+            - ~/.cargo/git
+            - target/
+
+  sqlx-test:
+    docker:
+      - image: rust:1.44
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            - v1-sqlx-{{ arch }}-{{ checksum "Cargo.lock" }}
+            - v1-sqlx-{{ arch }}
+
+      - run: |
+          cargo test --manifest-path sqlx-core/Cargo.toml \
+            --features offline,all-databases,all-types
+
+      - save_cache:
+          key: v1-sqlx-{{ arch }}-{{ checksum "Cargo.lock" }}
+          paths:
+            - ~/.cargo/registry
+            - ~/.cargo/git
+            - target/
+
+  sqlx-postgres:
+    docker:
+      - image: circleci/rust:1.44
+    parameters:
+      runtime:
+        type: string
+        default: "async-std"
+      postgres:
+        type: string
+    steps:
+      - checkout
+
+#      - restore_cache:
+#          keys:
+#            - v1-sqlx-{{ arch }}-{{ checksum "Cargo.lock" }}-<<parameters.runtime>>-postgres
+#            - v1-sqlx-{{ arch }}-{{ checksum "Cargo.lock" }}-<<parameters.runtime>>
+#            - v1-sqlx-{{ arch }}
+
+#      - run:
+#          name: Install Docker Compose
+#          command: |
+#            set -x
+#            curl -L https://github.com/docker/compose/releases/download/1.25.3/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+#            chmod +x /usr/local/bin/docker-compose
+#
+#      - setup_remote_docker
+
+      - run: docker-compose -f tests/docker-compose.yml run -d -p 5432:5432 postgres_<<parameters.postgres>>
+      - run: sleep 10
+
+      - run:
+          command: |
+            cargo test -p sqlx \
+              --no-default-features \
+              --features offline,postgres,all-types,runtime-<<parameters.runtime>>
+          environment:
+            DATABASE_URL: postgres://postgres:password@localhost:5432/sqlx
+
+#      - save_cache:
+#          key: v1-sqlx-{{ arch }}-{{ checksum "Cargo.lock" }}-<<parameters.runtime>>-postgres
+#          paths:
+#            - ~/.cargo/registry
+#            - ~/.cargo/git
+#            - target/
+
+workflows:
+  version: 2
+  sqlx:
+    jobs:
+      - format
+
+      - sqlx-test
+
+      - sqlx-check:
+          matrix:
+            parameters:
+              runtime: ["async-std", "tokio", "actix"]
+
+      - sqlx-postgres:
+          matrix:
+            parameters:
+              runtime: ["async-std", "tokio", "actix"]
+              postgres: ["12", "10", "9_6", "9_5"]
