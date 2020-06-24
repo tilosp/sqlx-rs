@@ -46,37 +46,51 @@ pub fn columns_to_rust<DB: DatabaseExt>(describe: &Describe<DB>) -> crate::Resul
         .columns
         .iter()
         .enumerate()
-        .map(|(i, column)| -> crate::Result<_> {
-            // add raw prefix to all identifiers
-            let decl = ColumnDecl::parse(&column.name)
-                .map_err(|e| format!("column name {:?} is invalid: {}", column.name, e))?;
-
-            let type_ = match decl.r#override {
-                Some(ColumnOverride::Exact(ty)) => Some(ty.to_token_stream()),
-                Some(ColumnOverride::Wildcard) => None,
-                // these three could be combined but I prefer the clarity here
-                Some(ColumnOverride::NonNull) => Some(get_column_type(i, column)),
-                Some(ColumnOverride::Nullable) => {
-                    let type_ = get_column_type(i, column);
-                    Some(quote! { Option<#type_> })
-                }
-                None => {
-                    let type_ = get_column_type(i, column);
-
-                    if column.not_null.unwrap_or(false) {
-                        Some(type_)
-                    } else {
-                        Some(quote! { Option<#type_> })
-                    }
-                }
-            };
-
-            Ok(RustColumn {
-                ident: decl.ident,
-                type_,
-            })
-        })
+        .map(|(i, col)| column_to_rust(i, col))
         .collect::<crate::Result<Vec<_>>>()
+}
+
+pub fn column_to_rust<DB: DatabaseExt>(i: usize, column: &Column<DB>) -> crate::Result<RustColumn> {
+    // add raw prefix to all identifiers
+    let decl = ColumnDecl::parse(&column.name)
+        .map_err(|e| format!("column name {:?} is invalid: {}", column.name, e))?;
+
+    let type_ = match decl.r#override {
+        Some(ColumnOverride::Exact(ty)) => Some(ty.to_token_stream()),
+        Some(ColumnOverride::Wildcard) => None,
+        // these three could be combined but I prefer the clarity here
+        Some(ColumnOverride::NonNull) => Some(get_column_type(i, column)),
+        Some(ColumnOverride::Nullable) => {
+            let type_ = get_column_type(i, column);
+            Some(quote! { Option<#type_> })
+        }
+        None => {
+            let type_ = get_column_type(i, column);
+
+            if column.not_null.unwrap_or(false) {
+                Some(type_)
+            } else {
+                Some(quote! { Option<#type_> })
+            }
+        }
+    };
+
+    Ok(RustColumn {
+        ident: decl.ident,
+        type_,
+    })
+}
+
+pub fn get_scalar_type<DB: DatabaseExt>(i: usize, column: &Column<DB>) -> TokenStream {
+    // We don't have a reliable way to tell the difference between a default column name assigned by
+    // the database and an improperly formatted ColumnDecl without hardcoding the former for each DB
+    // (which are likely not guaranteed to be stable), so instead we just throw away the error
+    if let Ok(column) = column_to_rust(i, column) {
+        // column type was wildcard
+        column.type_.unwrap_or_else(|| quote! { _ })
+    } else {
+        get_column_type(i, column)
+    }
 }
 
 pub fn quote_query_as<DB: DatabaseExt>(
@@ -172,6 +186,12 @@ impl ColumnDecl {
         // if we tried to feed this into `syn::parse_str()` we might get an un-great error
         // for some kinds of invalid identifiers
         let (ident, remainder) = if let Some(i) = col_name.find(&[':', '!', '?'][..]) {
+            if i == 0 {
+                return Err(
+                    format!("column name starts with invalid character: {:?}", col_name).into(),
+                );
+            }
+
             let (ident, remainder) = col_name.split_at(i);
 
             (parse_ident(ident)?, remainder)

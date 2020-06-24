@@ -141,6 +141,17 @@ async fn test_query_file_as() -> anyhow::Result<()> {
 }
 
 #[sqlx_macros::test]
+async fn test_query_scalar() -> anyhow::Result<()> {
+    let mut conn = new::<Postgres>().await?;
+
+    let id = sqlx::query_scalar!("select 1").fetch_one(&mut conn).await?;
+
+    assert_eq!(id, 1i32);
+
+    Ok(())
+}
+
+#[sqlx_macros::test]
 async fn query_by_string() -> anyhow::Result<()> {
     let mut conn = new::<Postgres>().await?;
 

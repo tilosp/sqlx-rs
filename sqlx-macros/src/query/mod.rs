@@ -195,23 +195,27 @@ where
     let query_args = format_ident!("query_args");
 
     let output = if data.describe.columns.is_empty() {
-        let db_path = DB::db_path();
-        let sql = &input.src;
+        if let RecordType::Generated = input.record_type {
+            let db_path = DB::db_path();
+            let sql = &input.src;
 
-        quote! {
-            sqlx::query_with::<#db_path, _>(#sql, #query_args)
+            quote! {
+                sqlx::query_with::<#db_path, _>(#sql, #query_args)
+            }
+        } else {
+            return Err("query produces no columns but this macro variant expects columns".into());
         }
     } else {
-        let columns = output::columns_to_rust::<DB>(&data.describe)?;
-
-        let (out_ty, mut record_tokens) = match input.record_type {
+        match input.record_type {
             RecordType::Generated => {
+                let columns = output::columns_to_rust::<DB>(&data.describe)?;
+
                 let record_name: Type = syn::parse_str("Record").unwrap();
 
                 for rust_col in &columns {
                     if rust_col.type_.is_none() {
                         return Err(
-                            "columns may not have wildcard overrides in `query!()` or `query_as!()"
+                            "columns may not have wildcard overrides in `query!()` or `query_unchecked!()"
                                 .into(),
                         );
                     }
@@ -224,26 +228,40 @@ where
                      }| quote!(#ident: #type_,),
                 );
 
-                let record_tokens = quote! {
+                let query_as =
+                    output::quote_query_as::<DB>(&input, &record_name, &query_args, &columns);
+
+                quote! {
                     #[derive(Debug)]
                     struct #record_name {
                         #(#record_fields)*
                     }
-                };
 
-                (Cow::Owned(record_name), record_tokens)
+                    #query_as
+                }
             }
-            RecordType::Given(ref out_ty) => (Cow::Borrowed(out_ty), quote!()),
-        };
+            RecordType::Given(ref out_ty) => {
+                let columns = output::columns_to_rust::<DB>(&data.describe)?;
+                output::quote_query_as::<DB>(&input, out_ty, &query_args, &columns)
+            }
+            RecordType::Scalar => {
+                if data.describe.columns.len() != 1 {
+                    return Err(format!(
+                        "expected exactly one column from query, got {}",
+                        data.describe.columns.len()
+                    )
+                    .into());
+                }
 
-        record_tokens.extend(output::quote_query_as::<DB>(
-            &input,
-            &out_ty,
-            &query_args,
-            &columns,
-        ));
+                let ty = output::get_scalar_type(1, &data.describe.columns[0]);
+                let db_path = DB::db_path();
+                let query = &input.src;
 
-        record_tokens
+                quote! {
+                    sqlx::query_scalar_with::<#db_path, #ty, _>(#query, #query_args)
+                }
+            }
+        }
     };
 
     let arg_names = &input.arg_names;

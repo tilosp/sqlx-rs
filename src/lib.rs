@@ -16,6 +16,9 @@ pub use sqlx_core::types::Type;
 pub use sqlx_core::value::{Value, ValueRef};
 
 #[doc(hidden)]
+pub use sqlx_core::arguments::ImmutableArguments;
+
+#[doc(hidden)]
 pub use sqlx_core::describe;
 
 #[doc(inline)]
