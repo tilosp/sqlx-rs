@@ -10,6 +10,7 @@ use hashbrown::HashMap;
 use std::fmt::Write;
 use std::mem;
 use std::sync::Arc;
+use crate::types::Json;
 
 impl PgConnection {
     pub(super) async fn handle_row_description(
@@ -261,22 +262,24 @@ SELECT oid FROM pg_catalog.pg_type WHERE typname ILIKE $1
 
     pub(crate) async fn get_nullable_for_columns(
         &mut self,
+        stmt_id: u32,
+        params_len: usize,
         columns: &[PgColumn],
     ) -> Result<Vec<Option<bool>>, Error> {
         if columns.is_empty() {
             return Ok(vec![]);
         }
 
-        let mut query = String::from("SELECT NOT pg_attribute.attnotnull FROM (VALUES ");
+        let mut nullable_query = String::from("SELECT NOT pg_attribute.attnotnull FROM (VALUES ");
         let mut args = PgArguments::default();
 
         for (i, (column, bind)) in columns.iter().zip((1..).step_by(3)).enumerate() {
             if !args.buffer.is_empty() {
-                query += ", ";
+                nullable_query += ", ";
             }
 
             let _ = write!(
-                query,
+                nullable_query,
                 "(${}::int4, ${}::int4, ${}::int2)",
                 bind,
                 bind + 1,
@@ -288,7 +291,7 @@ SELECT oid FROM pg_catalog.pg_type WHERE typname ILIKE $1
             args.add(column.relation_attribute_no);
         }
 
-        query.push_str(
+        nullable_query.push_str(
             ") as col(idx, table_id, col_idx) \
             LEFT JOIN pg_catalog.pg_attribute \
                 ON table_id IS NOT NULL \
@@ -297,8 +300,46 @@ SELECT oid FROM pg_catalog.pg_type WHERE typname ILIKE $1
             ORDER BY col.idx",
         );
 
-        query_scalar_with::<_, Option<bool>, _>(&query, args)
+        let mut nullables = query_scalar_with::<_, Option<bool>, _>(&nullable_query, args)
             .fetch_all(self)
-            .await
+            .await?;
+
+        // patch up our null inference if there's any columns we couldn't account for
+        if nullables.contains(&None) {
+            let nullables_fallback = self.nullables_from_explain(stmt_id, params_len).await?;
+
+            for (nullable, fallback) in nullables.iter_mut().zip(nullables_fallback) {
+                *nullable = nullable.or(fallback);
+            }
+        }
+
+        Ok(nullables)
+    }
+
+    fn nullables_from_explain(&mut self, stmt_id: u32, params_len: usize) -> Vec<Option<bool>> {
+        let mut explain = format!("EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE sqlx_s_{}", stmt_id);
+        let mut comma = false;
+
+        if params_len > 0 {
+            explain += "(";
+
+            // fill the arguments list with NULL, which should theoretically be valid
+            for _ in 0 .. params_len {
+                if comma {
+                    explain += ", ";
+                }
+
+                explain += "NULL";
+                comma = true;
+            }
+
+            explain += ")";
+        }
+
+        let (Json([explain]),): (Json<[serde_json::Value; 1]>,)  = sqlx::query_as(&explain)
+            .fetch_one(self)
+            .await?;
+
+
     }
 }

@@ -360,7 +360,7 @@ impl<'c> Executor<'c> for &'c mut PgConnection {
             self.handle_row_description(rows, true).await?;
 
             let columns = (&*self.scratch_row_columns).clone();
-            let nullable = self.get_nullable_for_columns(&columns).await?;
+            let nullable = self.get_nullable_for_columns(id, params.len(), &columns).await?;
 
             Ok(StatementInfo {
                 columns,
