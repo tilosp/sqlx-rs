@@ -91,19 +91,19 @@ for path in glob(os.path.join(os.path.dirname(__file__), "target/**/*.gc*"), rec
 run("cargo c", comment="check with a default set of features", tag="check")
 
 run(
-    "cargo c --no-default-features --features runtime-async-std,all-databases,all-types,offline,macros",
+    "cargo c --no-default-features --features runtime-async-std-native-tls,all-databases,all-types,offline,macros",
     comment="check with async-std",
     tag="check_async_std"
 )
 
 run(
-    "cargo c --no-default-features --features runtime-tokio,all-databases,all-types,offline,macros",
+    "cargo c --no-default-features --features runtime-tokio-native-tls,all-databases,all-types,offline,macros",
     comment="check with tokio",
     tag="check_tokio"
 )
 
 run(
-    "cargo c --no-default-features --features runtime-actix,all-databases,all-types,offline,macros",
+    "cargo c --no-default-features --features runtime-actix-native-tls,all-databases,all-types,offline,macros",
     comment="check with actix",
     tag="check_actix"
 )
@@ -119,7 +119,7 @@ run(
 )
 
 run(
-    "cargo test --no-default-features --manifest-path sqlx-core/Cargo.toml --features all-databases,all-types,runtime-tokio",
+    "cargo test --no-default-features --manifest-path sqlx-core/Cargo.toml --features all-databases,all-types,runtime-tokio-native-tls",
     comment="unit test core",
     tag="unit_tokio"
 )
@@ -128,7 +128,7 @@ run(
 # integration tests
 #
 
-for runtime in ["async-std", "tokio", "actix"]:
+for runtime in ["async-std-native-tls", "tokio-native-tls", "actix-native-tls"]:
 
     #
     # sqlite
@@ -138,7 +138,7 @@ for runtime in ["async-std", "tokio", "actix"]:
         f"cargo test --no-default-features --features macros,offline,any,all-types,sqlite,runtime-{runtime}",
         comment=f"test sqlite",
         service="sqlite",
-        tag=f"sqlite" if runtime == "async-std" else f"sqlite_{runtime}",
+        tag=f"sqlite" if runtime == "async-std-native-tls" else f"sqlite_{runtime}",
     )
 
     #
@@ -150,7 +150,7 @@ for runtime in ["async-std", "tokio", "actix"]:
             f"cargo test --no-default-features --features macros,offline,any,all-types,postgres,runtime-{runtime}",
             comment=f"test postgres {version}",
             service=f"postgres_{version}",
-            tag=f"postgres_{version}" if runtime == "async-std" else f"postgres_{version}_{runtime}",
+            tag=f"postgres_{version}" if runtime == "async-std-native-tls" else f"postgres_{version}_{runtime}",
         )
 
     # +ssl
@@ -160,7 +160,7 @@ for runtime in ["async-std", "tokio", "actix"]:
             comment=f"test postgres {version} ssl",
             database_url_args="sslmode=verify-ca&sslrootcert=.%2Ftests%2Fcerts%2Fca.crt",
             service=f"postgres_{version}",
-            tag=f"postgres_{version}_ssl" if runtime == "async-std" else f"postgres_{version}_ssl_{runtime}",
+            tag=f"postgres_{version}_ssl" if runtime == "async-std-native-tls" else f"postgres_{version}_ssl_{runtime}",
         )
 
     #
@@ -172,7 +172,7 @@ for runtime in ["async-std", "tokio", "actix"]:
             f"cargo test --no-default-features --features macros,offline,any,all-types,mysql,runtime-{runtime}",
             comment=f"test mysql {version}",
             service=f"mysql_{version}",
-            tag=f"mysql_{version}" if runtime == "async-std" else f"mysql_{version}_{runtime}",
+            tag=f"mysql_{version}" if runtime == "async-std-native-tls" else f"mysql_{version}_{runtime}",
         )
 
     #
@@ -184,7 +184,7 @@ for runtime in ["async-std", "tokio", "actix"]:
             f"cargo test --no-default-features --features macros,offline,any,all-types,mysql,runtime-{runtime}",
             comment=f"test mariadb {version}",
             service=f"mariadb_{version}",
-            tag=f"mariadb_{version}" if runtime == "async-std" else f"mariadb_{version}_{runtime}",
+            tag=f"mariadb_{version}" if runtime == "async-std-native-tls" else f"mariadb_{version}_{runtime}",
         )
 
     #
@@ -196,7 +196,7 @@ for runtime in ["async-std", "tokio", "actix"]:
             f"cargo test --no-default-features --features macros,offline,any,all-types,mssql,runtime-{runtime}",
             comment=f"test mssql {version}",
             service=f"mssql_{version}",
-            tag=f"mssql_{version}" if runtime == "async-std" else f"mssql_{version}_{runtime}",
+            tag=f"mssql_{version}" if runtime == "async-std-native-tls" else f"mssql_{version}_{runtime}",
         )
 
 # TODO: Use [grcov] if available

@@ -67,10 +67,10 @@ async fn upgrade(stream: &mut MySqlStream, options: &MySqlConnectOptions) -> Res
         }
     }
 
-    #[cfg(not(feature = "runtime-async-std"))]
+    #[cfg(not(feature = "runtime-async-std-native-tls"))]
     let connector = builder.build().map_err(Error::tls)?;
 
-    #[cfg(feature = "runtime-async-std")]
+    #[cfg(feature = "runtime-async-std-native-tls")]
     let connector = builder;
 
     stream.upgrade(&options.host, connector.into()).await?;

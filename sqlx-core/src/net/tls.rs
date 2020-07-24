@@ -72,7 +72,10 @@ where
         }
     }
 
-    #[cfg(any(feature = "runtime-actix", feature = "runtime-tokio"))]
+    #[cfg(any(
+        feature = "runtime-actix-native-tls",
+        feature = "runtime-tokio-native-tls"
+    ))]
     fn poll_read_buf<B>(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -117,7 +120,10 @@ where
         }
     }
 
-    #[cfg(any(feature = "runtime-actix", feature = "runtime-tokio"))]
+    #[cfg(any(
+        feature = "runtime-actix-native-tls",
+        feature = "runtime-tokio-native-tls"
+    ))]
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match &mut *self {
             MaybeTlsStream::Raw(s) => Pin::new(s).poll_shutdown(cx),
@@ -127,7 +133,7 @@ where
         }
     }
 
-    #[cfg(feature = "runtime-async-std")]
+    #[cfg(feature = "runtime-async-std-native-tls")]
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match &mut *self {
             MaybeTlsStream::Raw(s) => Pin::new(s).poll_close(cx),
@@ -137,7 +143,10 @@ where
         }
     }
 
-    #[cfg(any(feature = "runtime-actix", feature = "runtime-tokio"))]
+    #[cfg(any(
+        feature = "runtime-actix-native-tls",
+        feature = "runtime-tokio-native-tls"
+    ))]
     fn poll_write_buf<B>(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -166,10 +175,10 @@ where
         match self {
             MaybeTlsStream::Raw(s) => s,
 
-            #[cfg(not(feature = "runtime-async-std"))]
+            #[cfg(not(feature = "runtime-async-std-native-tls"))]
             MaybeTlsStream::Tls(s) => s.get_ref().get_ref().get_ref(),
 
-            #[cfg(feature = "runtime-async-std")]
+            #[cfg(feature = "runtime-async-std-native-tls")]
             MaybeTlsStream::Tls(s) => s.get_ref(),
 
             MaybeTlsStream::Upgrading => panic!(io::Error::from(io::ErrorKind::ConnectionAborted)),
@@ -185,10 +194,10 @@ where
         match self {
             MaybeTlsStream::Raw(s) => s,
 
-            #[cfg(not(feature = "runtime-async-std"))]
+            #[cfg(not(feature = "runtime-async-std-native-tls"))]
             MaybeTlsStream::Tls(s) => s.get_mut().get_mut().get_mut(),
 
-            #[cfg(feature = "runtime-async-std")]
+            #[cfg(feature = "runtime-async-std-native-tls")]
             MaybeTlsStream::Tls(s) => s.get_mut(),
 
             MaybeTlsStream::Upgrading => panic!(io::Error::from(io::ErrorKind::ConnectionAborted)),

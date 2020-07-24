@@ -60,7 +60,10 @@ impl AsyncRead for Socket {
         }
     }
 
-    #[cfg(any(feature = "runtime-actix", feature = "runtime-tokio"))]
+    #[cfg(any(
+        feature = "runtime-actix-native-tls",
+        feature = "runtime-tokio-native-tls"
+    ))]
     fn poll_read_buf<B>(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -102,7 +105,10 @@ impl AsyncWrite for Socket {
         }
     }
 
-    #[cfg(any(feature = "runtime-actix", feature = "runtime-tokio"))]
+    #[cfg(any(
+        feature = "runtime-actix-native-tls",
+        feature = "runtime-tokio-native-tls"
+    ))]
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match &mut *self {
             Socket::Tcp(s) => Pin::new(s).poll_shutdown(cx),
@@ -112,7 +118,7 @@ impl AsyncWrite for Socket {
         }
     }
 
-    #[cfg(feature = "runtime-async-std")]
+    #[cfg(feature = "runtime-async-std-native-tls")]
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match &mut *self {
             Socket::Tcp(s) => Pin::new(s).poll_close(cx),
@@ -122,7 +128,10 @@ impl AsyncWrite for Socket {
         }
     }
 
-    #[cfg(any(feature = "runtime-actix", feature = "runtime-tokio"))]
+    #[cfg(any(
+        feature = "runtime-actix-native-tls",
+        feature = "runtime-tokio-native-tls"
+    ))]
     fn poll_write_buf<B>(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,

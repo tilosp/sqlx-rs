@@ -47,7 +47,7 @@ pub use ssl_mode::PgSslMode;
 /// # use sqlx_core::postgres::{PgConnectOptions, PgConnection, PgSslMode};
 /// #
 /// # fn main() {
-/// # #[cfg(feature = "runtime-async-std")]
+/// # #[cfg(feature = "runtime-async-std-native-tls")]
 /// # sqlx_rt::async_std::task::block_on::<_, Result<(), Error>>(async move {
 /// // URI connection string
 /// let conn = PgConnection::connect("postgres://localhost/mydb").await?;
